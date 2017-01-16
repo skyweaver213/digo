@@ -1,0 +1,47 @@
+{
+  "name": "digo",
+  "version": "0.1.0",
+  "repository": "https://github.com/digojs/digo",
+  "description": "基于规则流程的自动化构建引擎",
+  "keywords": [
+    "task runner",
+    "build system",
+    "任务系统",
+    "打包",
+    "构建"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "xuld <xuld@vip.qq.com>",
+  "engines": {
+    "node": ">=6.0",
+    "npm": ">=3"
+  },
+  "engineStrict": true,
+  "main": "./_build/lib/index.js",
+  "typings": "./lib/digo.ts",
+  "bin": {
+    "digo": "./_build/bin/digo.js"
+  },
+  "dependencies": {
+    "@types/node": "latest",
+    "@types/mocha": "latest",
+    "typescript": "next"
+  },
+  "devDependencies": {
+    "coveralls": "latest",
+    "istanbul": "latest",
+    "mocha": "latest",
+    "source-map-support": "latest",
+    "typedoc": "latest"
+  },
+  "scripts": {
+    "install": "node digofile.js compile",
+    "test": "node digofile.js test",
+    "build": "node digofile.js build",
+    "clean": "node digofile.js clean",
+    "coverage": "node digofile.js coverage",
+    "coveralls": "node digofile.js coveralls",
+    "dist": "node digofile.js dist",
+    "doc": "node digofile.js doc"
+  }
+}
