@@ -73,7 +73,7 @@ export interface Config {
     /**
      * 文件的生成模式。
      */
-    buildMode: typeof file.buildMode | "build" | "clean" | "preview";
+    buildMode?: typeof file.buildMode | "build" | "clean" | "preview";
 
     /**
      * 设置读写文件使用的默认编码。
