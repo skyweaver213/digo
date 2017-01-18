@@ -148,6 +148,7 @@ export class Watcher extends FSWatcher {
     private rebuild() {
         then(() => {
             this.reset();
+            this.emit("rebuild", this.changed, this.deleted);
             for (const list of this.rootLists) {
                 let added = false;
                 for (const p of this.deleted) {
@@ -254,6 +255,67 @@ export class Watcher extends FSWatcher {
         off("fileSave", this.updateDep);
         super.close(callback);
     }
+
+}
+
+export interface Watcher {
+
+    /**
+     * 绑定一个重新生成事件。
+     * @param changes 所有已更新需要重新生成的文件。
+     * @param deletes 所有已删除需要重新生成的文件。
+     */
+    on(event: "rebuild", listener: (changes: string[], deletes: string[]) => void): this;
+
+    /**
+     * 绑定一个文件删除事件。
+     * @param path 相关的文件绝对路径。
+     * @param lastWriteTime 最后修改时间。
+     */
+    on(event: "delete", listener: (path: string, lastWriteTime: number) => void): this;
+
+    /**
+     * 绑定一个文件夹删除事件。
+     * @param path 相关的文件夹绝对路径。
+     * @param lastEntries 最后文件列表。
+     */
+    on(event: "deleteDir", listener: (path: string, lastEntries: string[]) => void): this;
+
+    /**
+     * 绑定一个文件创建事件。
+     * @param path 相关的文件绝对路径。
+     * @param stats 文件属性对象。
+     */
+    on(event: "create", listener: (path: string, stats: nfs.Stats) => void): this;
+
+    /**
+     * 绑定一个文件夹删除事件。
+     * @param path 相关的文件夹绝对路径。
+     * @param entries 文件列表。
+     */
+    on(event: "createDir", listener: (path: string, entries: string[]) => void): this;
+
+    /**
+     * 绑定一个文件改变事件。
+     * @param path 相关的文件绝对路径。
+     * @param stats 相关的文件属性对象。
+     * @param lastWriteTime 最后修改时间。
+     */
+    on(event: "change", listener: (path: string, stats: nfs.Stats, lastWriteTime: number) => void): this;
+
+    /**
+     * 绑定一个错误事件。
+     * @param error 相关的错误对象。
+     * @param path 相关的文件绝对路径。
+     */
+    on(event: "error", listener: (error: NodeJS.ErrnoException, path: string) => void): this;
+
+    /**
+     * 绑定一个事件。
+     * @param event 要绑定的事件名。
+     * @param listener 要绑定的事件监听器。
+     */
+    on(event: string | symbol, listener: Function);
 
 }
 
