@@ -190,11 +190,10 @@ export class Watcher extends FSWatcher {
     readonly rootLists: RootFileList[] = [];
 
     /**
-     * 初始化新的监听器。
-     * @param task 默认执行的任务名。
+     * 执行并开始监听指定的任务。
+     * @param task 执行的任务名。
      */
-    constructor(task: AsyncCallback) {
-        super();
+    start(task: AsyncCallback) {
         const addList = (value: RootFileList) => {
             if (value.globOnly) {
                 this.rootLists.push(value);
@@ -354,7 +353,9 @@ export function watch(pattern: Pattern | AsyncCallback, listener?: (event: "crea
     if (watcher) {
         watcher.close();
     }
-    return watcher = new Watcher(pattern as AsyncCallback);
+    watcher = new Watcher();
+    watcher.start(pattern as AsyncCallback);
+    return watcher;
 }
 
 /**
