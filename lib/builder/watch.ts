@@ -208,7 +208,7 @@ export class Watcher extends FSWatcher {
         on("addList", addList);
         on("addFile", addFile);
         on("addDir", addDir);
-        on("fileSave", this.updateDep = this.updateDep.bind(this));
+        on("fileDep", this.addDep = this.addDep.bind(this));
 
         then(task.length ? done => {
             const result = task(done);
@@ -230,18 +230,17 @@ export class Watcher extends FSWatcher {
     }
 
     /**
-     * 更新文件的依赖项。
+     * 添加文件的依赖项。
      * @param file 相关的文件。
+     * @param dep 依赖的绝对路径。
      */
-    updateDep(file: file.File) {
+    addDep(file: file.File, path: string) {
         if (file.srcPath) {
-            if (file.deps) {
-                this.deps[file.srcPath] = file.deps;
-                for (const dep of file.deps) {
-                    this.add(dep);
-                }
-            } else if (!file.errorCount) {
-                delete this.deps[file.srcPath];
+            this.add(file.srcPath);
+            const deps = this.deps[file.srcPath] || (this.deps[file.srcPath] = []);
+            if (deps.indexOf(path) < 0) {
+                deps.push(path);
+                this.add(path);
             }
         }
     }
@@ -251,7 +250,7 @@ export class Watcher extends FSWatcher {
      * @param callback 删除完成后的回调函数。
      */
     close(callback?: () => void) {
-        off("fileSave", this.updateDep);
+        off("fileDep", this.addDep);
         super.close(callback);
     }
 
