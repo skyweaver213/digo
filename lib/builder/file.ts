@@ -606,80 +606,100 @@ export class File {
 
         }
 
-        // 保存完成后的回调。
         const sourceMapPath = this.sourceMap && this.sourceMapData && !this.sourceMapInline && this.sourceMapPath;
-        let taskId: string;
-        const args = { file: this.toString() };
-        let firstError: NodeJS.ErrnoException;
-        let pending = 1;
-        const done = (error: NodeJS.ErrnoException | null) => {
-            if (error) {
-                this.error({
-                    showStack: false,
-                    error: error
+
+        if (saveFile) {
+            if (sourceMapPath) {
+                saveFile(sourceMapPath, this.buildMode === BuildMode.clean ? null : stringToBuffer(this.sourceMapString));
+            }
+            if (this.buildMode === BuildMode.clean) {
+                saveFile(savePath, null);
+            } else if (sourceMapEmit) {
+                saveFile(savePath, stringToBuffer(appendSourceMapUrl(this.content, this.sourceMapInline ? base64Uri("application/json", this.sourceMapString) : this.sourceMapUrl, /\.js$/i.test(this.name!))));
+                callback && callback(null, this);
+            } else if (this.loaded) {
+                saveFile(savePath, this.buffer);
+                callback && callback(null, this);
+            } else {
+                this.load(error => {
+                    if (!error) {
+                        saveFile!(savePath, this.buffer);
+                    }
+                    callback && callback(error, this);
                 });
             }
-            firstError = firstError || error;
-            if (--pending < 1) {
-                end(taskId);
-                if (!firstError) {
-                    fileCount++;
-                    if (onFileSave) {
-                        onFileSave(this);
-                    }
+        } else {
+            let taskId: string;
+            const args = { file: this.toString() };
+            let firstError: NodeJS.ErrnoException;
+            let pending = 1;
+            const done = (error: NodeJS.ErrnoException | null) => {
+                if (error) {
+                    this.error({
+                        showStack: false,
+                        error: error
+                    });
                 }
-                callback && callback(firstError, this);
-            }
-        };
-        switch (this.buildMode) {
-            // 生成文件。
-            case BuildMode.build:
-                if (sourceMapEmit) {
-                    taskId = begin("Save: {file}", args);
-                    writeFile(savePath, stringToBuffer(appendSourceMapUrl(this.content, this.sourceMapInline ? base64Uri("application/json", this.sourceMapString) : this.sourceMapUrl, /\.js$/i.test(this.name!)), this.encoding), done);
-                } else {
-                    if (modified) {
+                firstError = firstError || error;
+                if (--pending < 1) {
+                    end(taskId);
+                    if (!firstError) {
+                        fileCount++;
+                        if (onFileSave) {
+                            onFileSave(this);
+                        }
+                    }
+                    callback && callback(firstError, this);
+                }
+            };
+            switch (this.buildMode) {
+                // 生成文件。
+                case BuildMode.build:
+                case BuildMode.watch:
+                case BuildMode.server:
+                    if (sourceMapEmit) {
                         taskId = begin("Save: {file}", args);
-                        writeFile(savePath, this._destBuffer || stringToBuffer(this._destContent, this.encoding), done);
-                    } else if (!this.generated) {
-                        taskId = begin("Copy: {file}", args);
-                        copyFile(this.initalPath!, savePath, done);
+                        writeFile(savePath, stringToBuffer(appendSourceMapUrl(this.content, this.sourceMapInline ? base64Uri("application/json", this.sourceMapString) : this.sourceMapUrl, /\.js$/i.test(this.name!)), this.encoding), done);
                     } else {
-                        taskId = begin("Save: {file}", args);
-                        writeFile(savePath, Buffer.allocUnsafe(0), done);
+                        taskId = begin(modified ? "Save: {file}" : "Copy: {file}", args);
+                        if (this.loaded) {
+                            writeFile(savePath, this.buffer, done);
+                        } else {
+                            copyFile(this.initalPath!, savePath, done);
+                        }
                     }
-                }
-                if (sourceMapPath) {
-                    pending++;
-                    writeFile(sourceMapPath, this.sourceMapString, done);
-                }
-                break;
-            // 清理文件。
-            case BuildMode.clean:
-                taskId = begin("Clean: {file}", args);
-                deleteFile(savePath, error => {
-                    if (error) {
-                        done(error.code === "EPERM" ? null : error);
-                    } else {
-                        deleteParentDirIfEmpty(savePath, done);
+                    if (sourceMapPath) {
+                        pending++;
+                        writeFile(sourceMapPath, this.sourceMapString, done);
                     }
-                });
-                if (sourceMapPath) {
-                    pending++;
-                    deleteFile(sourceMapPath, error => {
+                    break;
+                // 清理文件。
+                case BuildMode.clean:
+                    taskId = begin("Clean: {file}", args);
+                    deleteFile(savePath, error => {
                         if (error) {
                             done(error.code === "EPERM" ? null : error);
                         } else {
-                            deleteParentDirIfEmpty(sourceMapPath, done);
+                            deleteParentDirIfEmpty(savePath, done);
                         }
                     });
-                }
-                break;
-            // 预览文件。
-            default:
-                taskId = begin("Preview Save: {file}", args);
-                done(null);
-                break;
+                    if (sourceMapPath) {
+                        pending++;
+                        deleteFile(sourceMapPath, error => {
+                            if (error) {
+                                done(error.code === "EPERM" ? null : error);
+                            } else {
+                                deleteParentDirIfEmpty(sourceMapPath, done);
+                            }
+                        });
+                    }
+                    break;
+                // 预览文件。
+                default:
+                    taskId = begin("Preview Save: {file}", args);
+                    done(null);
+                    break;
+            }
         }
     }
 
@@ -1078,6 +1098,13 @@ export var onFileSave = (file: File) => { emit("fileSave", file); };
  * @param file 当前相关的文件。
  */
 export var onFileDelete = (file: File) => { emit("fileDelete", file); };
+
+/**
+ * 获取或设置在虚拟保存文件的回调函数。
+ * @param path 当前写入的文件路径。
+ * @param buffer 当前写入的文件内容。
+ */
+export var saveFile: null | ((path: string, buffer: Buffer | null) => void) = null;
 
 /**
  * 获取已处理的文件数。

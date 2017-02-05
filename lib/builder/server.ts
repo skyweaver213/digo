@@ -1,4 +1,3 @@
-import { readFile } from '../utility/fs';
 /**
  * @file 服务器
  * @author xuld <xuld@vip.qq.com>
@@ -6,13 +5,15 @@ import { readFile } from '../utility/fs';
 import { EventEmitter } from "events";
 import * as http from "http";
 import * as nu from "url";
+import { stringToBuffer } from "../utility/encode";
 import { AsyncCallback } from "../utility/asyncQueue";
 import { HttpServer } from "../utility/httpServer";
 import { Matcher, Pattern } from "../utility/matcher";
-import { getExt, resolvePath } from '../utility/path';
+import { getExt, resolvePath, inDir, relativePath, pathEquals } from '../utility/path';
+import { readFile, getStat, readDir } from '../utility/fs';
 import { asyncQueue, then } from "./async";
 import { off, on } from "./events";
-import { File } from "./file";
+import * as file from "./file";
 import { error } from "./logging";
 import { watch } from "./watch";
 
@@ -39,20 +40,88 @@ export class Server extends HttpServer {
     }
 
     /**
+     * 是否允许服务器跨域。
+     */
+    crossOrigin = true;
+
+    getCoressOriginHeaders(req: http.IncomingMessage) {
+        return {
+            "Access-Control-Allow-Origin": req.headers["Origin"] || "*",
+            "Access-Control-Allow-Methods": req.headers["Access-Control-Request-Method"] || "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": req.headers["Access-Control-Request-Headers"] || "X-Requested-With"
+        };
+    }
+
+    /**
      * 当被子类重写时负责处理所有请求。
      * @param req 当前的请求对象。
      * @param res 当前的响应对象。
      */
     protected processRequest(req: http.IncomingMessage, res: http.ServerResponse) {
-        const path = req.url!.replace(/?#.*$/, "");
+        if (this.crossOrigin && req.method === "OPTIONS") {
+            res.writeHead(200, this.getCoressOriginHeaders(req));
+            res.end();
+            return;
+        }
+
+        const queryIndex = req.url!.search(/[#\?]/);
+        const url = queryIndex < 0 ? req.url! : req.url!.substr(0, queryIndex);
         for (const handler of this.handlers) {
-            if (handler.matcher.test(path) && handler.process(req, res) === false) {
+            if (handler.matcher.test(url) && handler.process(req, res) === false) {
                 return;
             }
         }
 
+        const path = this.urlToPath(url);
+        if (path === null) {
+            this.writeError(req, res, 400, url);
+            return;
+        }
 
-
+        getStat(path, (error, stats) => {
+            if (error) {
+                if (error.code === "ENOENT") {
+                    this.writeError(req, res, 404, path);
+                } else if (error.code === "EPERM") {
+                    this.writeError(req, res, 403, path);
+                } else {
+                    this.writeError(req, res, 400, path);
+                }
+            } else if (stats.isDirectory()) {
+                // 修复 /path/to 为 /path/to/
+                if (url.charCodeAt(url.length - 1) !== 47/*/*/) {
+                    const newUrl = url + "/" + (queryIndex > 0 ? req.url!.substr(queryIndex) : "");
+                    res.writeHead(302, {
+                        Location: newUrl,
+                        ...(this.crossOrigin ? this.getCoressOriginHeaders(req) : {}),
+                        ...this.headers
+                    });
+                    res.end(`Object Moved To <a herf="${newUrl}">${newUrl}</a>`);
+                } else {
+                    const checkDefaultPage = (index: number) => {
+                        if (index < this.defaultPages.length) {
+                            const defaultPage = path + this.defaultPages[index];
+                            readFile(defaultPage, (error, data) => {
+                                if (error) {
+                                    if (error.code === "ENOENT") {
+                                        checkDefaultPage(index + 1);
+                                    } else {
+                                        this.writeFile(req, res, 400, defaultPage);
+                                    }
+                                } else {
+                                    this.writeFile(req, res, 200, defaultPage, data);
+                                }
+                            });
+                        } else {
+                            this.writeDir(req, res, path);
+                        }
+                    };
+                    checkDefaultPage(0);
+                }
+            } else {
+                this.writeFile(req, res, 200, path);
+            }
+        });
     }
 
     /**
@@ -64,15 +133,111 @@ export class Server extends HttpServer {
      * @param data 相关的内容。
      */
     writeFile(req: http.IncomingMessage, res: http.ServerResponse, statusCode: number, path: string, data?: string | Buffer) {
+        // const preset = this.files[path.toLowerCase()];
+        // if (preset !== undefined) {
+        //     data = preset;
+        // } else
         if (data === undefined) {
             readFile(path, (error, data) => {
                 this.writeFile(req, res, statusCode, path, data);
             });
             return;
         }
+        if (typeof data === "string") {
+            data = stringToBuffer(data);
+        }
         res.writeHead(statusCode, {
             "Content-Type": this.mimeTypes[getExt(path).toLowerCase()] || this.mimeTypes["*"],
+            "Content-Length": data.length,
+            ...(this.crossOrigin ? this.getCoressOriginHeaders(req) : {}),
             ...this.headers
+        });
+        res.end(data);
+    }
+
+    /**
+     * 向指定的请求写入目录。
+     * @param req 当前的请求对象。
+     * @param res 当前的响应对象。
+     * @param statusCode 请求的错误码。
+     * @param path 相关的路径。
+     * @param data 相关的内容。
+     */
+    writeDir(req: http.IncomingMessage, res: http.ServerResponse, path: string) {
+        readDir(path, (error, entries) => {
+            if (error) {
+                this.writeError(req, res, 400, path);
+            } else {
+                let pending = entries.length;
+                const dirs: string[] = [];
+                const files: string[] = [];
+                const done = () => {
+
+                    let html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>${encodeHTML(path)}</title>
+    <style>
+        body {
+            font-family: Courier New;
+            line-height: 135%;
+        }
+        ul {
+            list-style: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>${encodeHTML(path)}</h1>
+    <ul>`;
+                    if (!pathEquals(path, this.root)) {
+                        html += `       <li><a href="../">../</a></li>\n`;
+                    }
+
+                    dirs.sort();
+                    for (const dir of dirs) {
+                        html += `       <li><a href="${dir}/">${dir}/</a></li>\n`;
+                    }
+
+                    files.sort();
+                    for (const file of files) {
+                        html += `       <li><a href="${file}">${file}</a></li>\n`;
+                    }
+
+                    html += `
+    </ul>
+</body>
+</html>`;
+
+                    const buffer = stringToBuffer(html);
+
+                    res.writeHead(200, {
+                        "Content-Type": "text/html",
+                        "Content-Length": buffer.length,
+                        ...(this.crossOrigin ? this.getCoressOriginHeaders(req) : {}),
+                        ...this.headers
+                    });
+
+                    res.end(buffer);
+                };
+                if (pending) {
+                    for (const entry of entries) {
+                        getStat(path + "/" + entry, (error, stats) => {
+                            if (!error && stats.isDirectory()) {
+                                dirs.push(entry);
+                            } else {
+                                files.push(entry);
+                            }
+                            if (--pending < 1) {
+                                done();
+                            }
+                        });
+                    }
+                } else {
+                    done();
+                }
+            }
         });
     }
 
@@ -89,10 +254,10 @@ export class Server extends HttpServer {
         <html>
         <head>
             <meta charset="utf-8">
-            <title>${statusCode} - ${http.STATUS_CODES[statusCode]}: ${htmlEncode(path || req.url!)}</title>
+            <title>${statusCode} - ${http.STATUS_CODES[statusCode]}: ${encodeHTML(path || req.url!)}</title>
         </head>
         <body>
-            <pre>${statusCode} - ${http.STATUS_CODES[statusCode]}: ${htmlEncode(path || req.url!)}</pre>
+            <pre>${statusCode} - ${http.STATUS_CODES[statusCode]}: ${encodeHTML(path || req.url!)}</pre>
         </body>
         </html>`);
     }
@@ -114,7 +279,7 @@ export class Server extends HttpServer {
             this.listen(undefined, done);
         });
         if (options.task) {
-            on("fileSave", this.setFile = this.setFile.bind(this));
+            (file as any).saveFile = this.saveFile.bind(this);
             watch(options.task);
         }
     }
@@ -124,28 +289,58 @@ export class Server extends HttpServer {
      * @param callback 关闭的回调函数。
      */
     close(callback?: () => void) {
-        off("fileSave", this.setFile);
+        delete (file as any).saveFile;
         super.close(callback);
-    }
-
-    /**
-     * 当文件更新后隐藏当前文件。
-     */
-    setFile(file: File) {
-        if (file.destPath && file.loaded) {
-            this.files[file.destPath] = file.data;
-        }
     }
 
     /**
      * 存储所有文件的内容。
      */
-    readonly files: { [path: string]: string | Buffer; } = { __proto__: null! };
+    readonly files: { [path: string]: Buffer; } = { __proto__: null! };
+
+    /**
+     * 当文件更新后隐藏当前文件。
+     * @param path 当前写入的文件路径。
+     * @param buffer 当前写入的文件内容。
+     */
+    saveFile(path: string, buffer: Buffer | null) {
+        if (buffer === null) {
+            delete this.files[path];
+        } else {
+            this.files[path] = buffer;
+        }
+    }
 
     /**
      * 获取或设置当前服务器的物理根路径。
      */
     root: string;
+
+    /**
+     * 将指定的物理路径转为网址。
+     * @param path 要转换的物理路径。
+     * @return 返回网址。如果转换失败则返回 null。
+     */
+    pathToUrl(path: string) {
+        if (!inDir(this.root, path)) {
+            return "";
+        }
+        path = relativePath(this.root, path);
+        if (path == ".") path = "";
+        return this.url + path;
+    }
+
+    /**
+     * 将指定的地址转为物理路径。
+     * @param url 要转换的网址。
+     * @return 返回物理路径。如果转换失败则返回 null。
+     */
+    urlToPath(url: string) {
+        if (!url.toLowerCase().startsWith(this.virtualPath.toLowerCase())) {
+            return null;
+        }
+        return resolvePath(this.root, url.substr(this.virtualPath.length));
+    }
 
     /**
      * 获取各扩展名的默认 MIME 类型。
@@ -190,13 +385,13 @@ export class Server extends HttpServer {
      * 获取自动插入的 HTTP 头。
      */
     headers: { [key: string]: string; } = {
-        Server: "digo"
+        Server: "digo-dev-server/0.1"
     };
 
     /**
      * 获取默认首页。
      */
-    defaultPages: { [key: string]: string; } = {};
+    defaultPages: string[] = [];
 
     /**
      * 获取所有处理器。
@@ -256,7 +451,7 @@ export function startServer(options: ServerOptions) {
  * @param value 要编码的字符串。
  * @returns 一个已编码的字符串。
  */
-export function htmlEncode(value: string) {
+export function encodeHTML(value: string) {
     return value.replace(/[&><"]/g, m => ({
         "&": "&amp;",
         ">": "&gt;",

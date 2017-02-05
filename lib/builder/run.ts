@@ -121,7 +121,7 @@ export function run(task: AsyncCallback, taskName = task.name || "TASK") {
                     buildMode === BuildMode.clean ? "cyan:Clean completed!" :
                         buildMode === BuildMode.preview ? "cyan:Preview completed!" :
                             fileCount === 0 ? "cyan:Done!" : errorCount > 0 ? "red:Build completed!" : warningCount > 0 ? "yellow:Build success!" : "green:Build success!"
-                }} (error: {${errorCount ? "red:" : ""}error}, warning: { ${warningCount ? "yellow:" : ""}warning}, ${fileCount > 0 ? "file: {file}, " : ""}elapsed: { elapsed }) `, {
+                }} (error: {${errorCount ? "red:" : ""}error}, warning: {${warningCount ? "yellow:" : ""}warning}, ${fileCount > 0 ? "file: {file}, " : ""}elapsed: {elapsed}) `, {
                     error: errorCount,
                     warning: warningCount,
                     file: fileCount,
