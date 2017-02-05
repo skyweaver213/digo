@@ -1,0 +1,58 @@
+{
+    "version": "0.1.0",
+    "command": "node",
+    "args": [
+        "digofile.js"
+    ],
+    "isShellCommand": false,
+    "tasks": [
+        {
+            "taskName": "build",
+            "args": [
+                "${file}"
+            ],
+            "isBuildCommand": true,
+            "problemMatcher": "$tsc"
+        },
+        {
+            "taskName": "watch",
+            "args": [
+                "${file}"
+            ],
+            "isWatching": true,
+            "problemMatcher": "$tsc"
+        },
+        {
+            "taskName": "test",
+            "args": [
+                "${file}"
+            ],
+            "isTestCommand": true,
+            "problemMatcher": "$tsc"
+        },
+        {
+            "taskName": "compile",
+            "args": [
+                "${file}"
+            ],
+            "problemMatcher": "$tsc"
+        },
+        {
+            "taskName": "coverage",
+            "args": [
+                "${file}"
+            ],
+            "problemMatcher": "$tsc"
+        },
+        {
+            "taskName": "dist",
+            "problemMatcher": "$tsc"
+        },
+        {
+            "taskName": "install"
+        },
+        {
+            "taskName": "doc"
+        }
+    ]
+}
