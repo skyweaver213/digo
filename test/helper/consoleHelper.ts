@@ -15,8 +15,12 @@ export function redirectOutput(func: (outputs: string[], done: () => void) => an
         if (buffer && buffer.length) {
             outputs.push(buffer.toString());
         }
-        if (typeof cb1 === "function") cb1();
-        if (typeof cb2 === "function") cb2();
+        if (typeof cb1 === "function") {
+            cb1();
+        }
+        if (typeof cb2 === "function") {
+            cb2();
+        }
         return true;
     };
     const restore = () => {

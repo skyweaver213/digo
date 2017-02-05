@@ -73,9 +73,9 @@ export namespace matcherTest {
 
         assert.equal(matcher.match("foo", "./"), true);
         if (np.sep === "\\") {
-            assert.equal(matcher.match("E:\foo", "E:\\foo"), true);
-            assert.equal(matcher.match("E:\foo\goo.txt", "E:\\foo"), true);
-            assert.equal(matcher.match("E:\foo\goo.txt", "E:\\foo\\*"), true);
+            assert.equal(matcher.match("E:\\foo", "E:\\foo"), true);
+            assert.equal(matcher.match("E:\\foo\\goo.txt", "E:\\foo"), true);
+            assert.equal(matcher.match("E:\\foo\\goo.txt", "E:\\foo\\*"), true);
         } else {
             assert.equal(matcher.match("/user/local", "/user/local"), true);
             assert.equal(matcher.match("/user/local/file.txt", "/user/local"), true);

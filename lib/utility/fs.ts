@@ -135,6 +135,42 @@ function existsInternal(funcName: "isDirectory" | "isFile", path: string, callba
 }
 
 /**
+ * 如果指定的路径已存在则执行重命名。
+ * @param path 要测试的文件或文件夹路径。
+ * @param callback 异步操作完成后的回调函数。如果不是函数则以同步的方式执行。
+ * @param tryCount 重试的次数。
+ * @return 返回确认不存在的路径。如果 *callback* 是函数则不返回。
+ */
+export function ensureNewPath(path: string, callback?: undefined, startId?: number): string;
+
+/**
+ * 如果指定的路径已存在则执行重命名。
+ * @param path 要测试的文件或文件夹路径。
+ * @param callback 异步操作完成后的回调函数。如果不是函数则以同步的方式执行。
+ * @param tryCount 重试的次数。
+ * @return 返回确认不存在的路径。如果 *callback* 是函数则不返回。
+ */
+export function ensureNewPath(path: string, callback?: (result: string) => void, startId?: number): void;
+
+export function ensureNewPath(path: string, callback?: (result: string) => void, startId?: number) {
+    const testPath = startId === undefined ? path : `${np.basename(path, np.extname(path))}_${startId}${np.extname(path)}`;
+    if (typeof callback === "function") {
+        nfs.exists(testPath, exists => {
+            if (!exists) {
+                callback(testPath);
+            } else {
+                ensureNewPath(path, callback, startId! + 1 || 1);
+            }
+        });
+    } else {
+        if (!nfs.existsSync(testPath)) {
+            return testPath;
+        }
+        return ensureNewPath(path, undefined, startId! + 1 || 1);
+    }
+}
+
+/**
  * 创建一个文件夹。
  * @param path 要创建的文件夹路径。
  * @param callback 异步操作完成后的回调函数。如果不是函数则以同步的方式执行。

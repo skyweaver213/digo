@@ -11,10 +11,10 @@ import * as assert from "assert";
  */
 export function skip(func: Function, count: number) {
     return function () {
-        count--;
-        if (count > 0) return;
-        assert.ok(count === 0, "skip(): Max call count exceeds.");
-        return func.apply(this, arguments);
+        if (--count < 1) {
+            assert.ok(count === 0, "skip(): Max call count exceeds.");
+            return func.apply(this, arguments);
+        }
     };
 }
 

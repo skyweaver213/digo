@@ -78,6 +78,51 @@ export namespace fsTest {
         assert.equal(fs.getStat("f1.txt").isFile(), true);
     }
 
+    export function getStatLinkTest(done: MochaDone) {
+        fs.getStatLink("non-exists", e => {
+            assert.equal(e && e.code, "ENOENT");
+            fs.getStatLink("dir1", (error, stats) => {
+                assert.ok(!error);
+                assert.equal(stats.isDirectory(), true);
+                fs.getStatLink("f1.txt", (error, stats) => {
+                    assert.ok(!error);
+                    assert.equal(stats.isFile(), true);
+                    done();
+                });
+            });
+        });
+    }
+
+    export function getStatLinkSyncTest() {
+        try {
+            nfs.statSync("non-exists");
+            assert.ok(false);
+        } catch (e) {
+            assert.equal(e.code, "ENOENT");
+        }
+        assert.equal(fs.getStatLink("dir1").isDirectory(), true);
+        assert.equal(fs.getStatLink("f1.txt").isFile(), true);
+    }
+
+    export function ensureNewPathTest(done: MochaDone) {
+        fs.ensureNewPath("non-exists", result => {
+            assert.equal(result, "non-exists");
+            fs.ensureNewPath("dir1", result => {
+                assert.equal(result, "dir1_1");
+                fs.ensureNewPath("f1.txt", result => {
+                    assert.equal(result, "f1_1.txt");
+                    done();
+                });
+            });
+        });
+    }
+
+    export function ensureNewPathSyncTest() {
+        assert.equal(fs.ensureNewPath("non-exists"), "non-exists");
+        assert.equal(fs.ensureNewPath("dir1"), "dir1_1");
+        assert.equal(fs.ensureNewPath("f1.txt"), "f1_1.txt");
+    }
+
     export function existsDirTest(done: MochaDone) {
         fs.existsDir("non-exists", result => {
             assert.equal(result, false);
