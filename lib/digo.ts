@@ -2,6 +2,11 @@
  * @file digo: 基于规则流程的自动化构建引擎
  * @see https://github.com/digojs/digo
  */
+import * as _digo from "./digo";
+declare global {
+    export var digo: typeof _digo;
+}
+
 export * from "./utility/date";
 export * from "./utility/encode";
 export * from "./utility/crypto";
@@ -28,8 +33,3 @@ export * from "./builder/watch";
 export * from "./builder/init";
 export * from "./builder/run";
 export * from "./builder/config";
-
-import * as _digo from "./index";
-declare global {
-    var digo: typeof _digo;
-}

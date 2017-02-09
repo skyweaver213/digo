@@ -41,13 +41,13 @@ exports.default = function () {
     }
 
     // 提取路径信息。
-    const url = parse(type);
-    const git = url.host ? (url.protocol || "https:") + url.host : "https://github.com";
+    const url = parse(type, false, true);
+    const git = url.host ? (url.protocol || "https:") + "//" + url.host : "https://github.com";
     const branch = url.hash && url.hash.slice(1) || "master";
     const pathParts = (url.pathname || "").replace(/^\//, "").split("/");
     const path = pathParts.length <= 1 ? "/digojs/digofiles" : "/" + pathParts[0] + "/" + pathParts[1];
     const dir = pathParts.length <= 1 ? pathParts[0] : pathParts.slice(2).join("/");
-    const readableUrl = git === "https://github.com" ? `${git}${path}/tree/${branch}/${dir}` : `${git}${path}#${branch} (${dir})`;
+    const readableUrl = git === "https://github.com" ? `${git}${path}/tree/${branch}/${dir}` : `${git}${path}#${branch} ${dir}`;
 
     const taskId = begin("Download: {url}", { url: readableUrl });
 
@@ -57,6 +57,8 @@ exports.default = function () {
     try {
         let result = spawnSync("git init", { shell: true, cwd: tmpDir });
         if (result.status !== 0) {
+            deleteDir(tmpDir);
+            end(taskId);
             fatal("Git is not installed properly, please download {url} manually: {error}", {
                 url: readableUrl,
                 error: result.error || result.stderr || "Unknown error"
@@ -69,6 +71,8 @@ exports.default = function () {
         }
         result = spawnSync(`git pull ${git}${path} ${branch}`, { shell: true, cwd: tmpDir });
         if (result.status !== 0) {
+            deleteDir(tmpDir);
+            end(taskId);
             fatal("Cannot download {url}: {error}", {
                 url: readableUrl,
                 error: result.error || result.stderr || "Unknown error"
@@ -77,6 +81,8 @@ exports.default = function () {
         }
         deleteDir(tmpDir + ".git");
         if (!existsDir(tmpDir + dir)) {
+            deleteDir(tmpDir);
+            end(taskId);
             fatal("Cannot find '{dir}' from {url}#{branch}", { url: git + path, branch, dir });
             return false;
         }

@@ -2,6 +2,32 @@
  * @file digo: 基于规则流程的自动化构建引擎
  * @author xuld <xuld@vip.qq.com>
  */
+declare var global;
+declare var __export;
+if (typeof global.digo === "object") {
+    module.exports = global.digo;
+    __export = require = function () { } as any;
+} else {
+    global.digo = module.exports;
+    __export = module => {
+        for (const key in module) {
+            if (!exports.hasOwnProperty(key)) {
+                if (typeof module[key] === "function") {
+                    exports[key] = module[key];
+                } else {
+                    Object.defineProperty(exports, key, {
+                        get() { return module[key]; },
+                        set(value) { return module[key] = value; }
+                    });
+                }
+            }
+        }
+        if (module.__esModule && "default" in module) {
+            delete exports.default;
+        }
+    };
+}
+
 export * from "./utility/object";
 export * from "./utility/date";
 export * from "./utility/encode";
@@ -36,29 +62,3 @@ export * from "./builder/server";
 export * from "./builder/init";
 export * from "./builder/run";
 export * from "./builder/config";
-
-import * as _digo from "./index";
-declare global {
-    var digo: typeof _digo;
-}
-
-(global as any).digo = exports;
-
-// 重写默认的 __export 函数以便可以重新导出数据。
-function __export(module) {
-    for (const key in module) {
-        if (!exports.hasOwnProperty(key)) {
-            if (typeof module[key] === "function") {
-                exports[key] = module[key];
-            } else {
-                Object.defineProperty(exports, key, {
-                    get() { return module[key]; },
-                    set(value) { return module[key] = value; }
-                });
-            }
-        }
-    }
-    if (module.__esModule && "default" in module) {
-        delete exports.default;
-    }
-}

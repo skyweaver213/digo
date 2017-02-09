@@ -31,7 +31,7 @@ function main() {
         return setImmediate(main, true);
     }
 
-    let digo: typeof _digo = require("../lib/index");
+    const digo: typeof _digo = require("../lib/index");
     let digoFile: string | undefined;
     let cwd: string | undefined;
     const configs: [keyof _digo.Config, any][] = [];
@@ -451,7 +451,7 @@ function main() {
      * @return 返回包中定义的版本号，如 "1.0.0"。
      */
     function getVersion() {
-        return "v" + require("digo/package.json").version;
+        return "v" + require("../package.json").version;
     }
 
     /**
@@ -553,9 +553,7 @@ function main() {
         if (cwd) {
             process.chdir(cwd);
         }
-        const tasks = digo.loadDigoFile(digoFile, !cwd);
-        digo = (global as any).digo || digo;
-        return tasks;
+        return digo.loadDigoFile(digoFile, !cwd);
     }
 
     /**

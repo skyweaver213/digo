@@ -337,14 +337,9 @@ export class FileList {
     dest(dir?: string | ((file: File) => string)) {
         return this.pipe({
             add(file, dir, done) {
-                file.save(typeof dir === "function" ? dir(file) : dir, (error, file) => {
-                    if (error) {
-                        file.error(error);
-                    }
-                    done();
-                });
+                file.save(typeof dir === "function" ? dir(file) : dir, done as () => void);
             }
-        }, dir);
+        }, dir || "");
     }
 
     /**
@@ -355,14 +350,9 @@ export class FileList {
     delete(deleteDir?: boolean) {
         return this.pipe({
             add(file, deleteDir, done) {
-                file.delete(deleteDir, (error, file) => {
-                    if (error) {
-                        file.error(error);
-                    }
-                    done();
-                });
+                file.delete(deleteDir, done as () => void);
             }
-        }, deleteDir);
+        }, deleteDir !== false);
     }
 
     /**
