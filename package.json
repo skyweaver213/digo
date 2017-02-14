@@ -2,7 +2,7 @@
   "name": "digo",
   "version": "0.1.0",
   "repository": "https://github.com/digojs/digo",
-  "description": "基于规则流程的自动化构建引擎",
+  "description": "打造简单极致的自动化构建引擎",
   "keywords": [
     "task runner",
     "build system",
